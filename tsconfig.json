@@ -4,7 +4,7 @@
     "checkJs": true,
     "outDir": "build",
     "esModuleInterop": true,
-    "types": ["node", "jest"],
+    "types": ["node"],
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
@@ -14,8 +14,6 @@
     "baseUrl": ".",
     "lib": [
       "esnext",
-      "DOM",
-      "DOM.Iterable"
     ],
     "typeRoots": ["node_modules/@types", "src/types"]
   },
