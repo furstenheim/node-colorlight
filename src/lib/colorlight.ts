@@ -1,7 +1,7 @@
 import { Eth } from './eth'
 import { type Bitmap } from './Bitmap'
 
-// Show a horizontal and vertical sweeping line on the LED matrix connected to the Colorlight 5A 75B
+// Check https://github.com/FalconChristmas/fpp/blob/master/src/channeloutput/ColorLight-5a-75.cpp
 export class ColorLight {
   width: number
   height: number
@@ -18,7 +18,7 @@ export class ColorLight {
   dest_mac: bigint
   flags: number
 
-  constructor (width: number, height: number, ethName: string) {
+  constructor (width: number, height: number, private readonly ethName: string) {
     this.width = width
     this.height = height
 
@@ -41,30 +41,10 @@ export class ColorLight {
     this.eth.socketOpen()
   }
 
-  set brightness (percent: number) {
-    const brightnessMap = [
-      [0, 0x00],
-      [1, 0x03],
-      [2, 0x05],
-      [4, 0x0a],
-      [5, 0x0d],
-      [6, 0x0f],
-      [10, 0x1a],
-      [25, 0x40],
-      [50, 0x80],
-      [75, 0xbf],
-      [100, 0xff]
-    ]
-    // TODO Math.floor(clamp(percent, 0, 100) / 100 * 256)
+  setBrightness (percent: number): void {
     this.brightnessPercent = percent
-    for (let i = 0; i < brightnessMap.length; ++i) {
-      const [p, v] = brightnessMap[i]
-      if (percent >= p) {
-        this.brightnessValue = v
-        this.initFrames()
-        break
-      }
-    }
+    this.brightnessValue = Math.floor(Math.min(Math.max(percent, 0), 100) / 100 * 256)
+    this.initFrames()
   }
 
   private initFrames (): void {
@@ -78,12 +58,19 @@ export class ColorLight {
     this.frameData0aff[1] = this.brightnessValue
     this.frameData0aff[2] = 255
 
+    // Row Number LSB. We'll fill this up when sending
     this.frameData5500[0] = 0
+    // MSB of pixel offset for this packet
     this.frameData5500[1] = 0
+    // LSB of pixel offset for this packet
     this.frameData5500[2] = 0
+    // MSB of pixel count in packet
     this.frameData5500[3] = this.width >> 8
+    // LSB of pixel count in packet
     this.frameData5500[4] = this.width % 0xFF
+    // No one knows
     this.frameData5500[5] = 0x08
+    // No one knows
     this.frameData5500[6] = 0x88
   }
 
@@ -97,27 +84,25 @@ export class ColorLight {
     }
   }
 
-  async showImage (bitmap: Bitmap, xOffset = 0, yOffset = 0): Promise<void> {
-    // Send a brightness packet
-    let n = this.eth.send(this.src_mac, this.dest_mac, 0x0a00 + this.brightnessValue, this.frameData0aff,
+  sendBrightness (): void {
+    this.eth.send(this.src_mac, this.dest_mac, 0x0a00 + this.brightnessValue, this.frameData0aff,
       this.frame0affDataLength, this.flags)
+  }
 
-    // for (let t = 0; t < this.width; ++t) {
+  async showImage (bitmap: Bitmap, xOffset = 0, yOffset = 0): Promise<void> {
     // Send one complete frame
-
+    this.eth.send(this.src_mac, this.dest_mac, 0x0101, this.frameData0107, this.frame0107DataLength, this.flags)
     for (let i = 0; i < Math.min(this.height - yOffset, bitmap.height); ++i) {
       const y = i + yOffset
       this.frame5500fromImage(y, xOffset, i, bitmap)
       this.frameData5500[0] = y
-      n = this.eth.send(this.src_mac, this.dest_mac, 0x5500, this.frameData5500, this.frame5500DataLength, this.flags)
+      // TODO etherType probably 0x5501 if sending row over 256 https://github.com/FalconChristmas/fpp/blob/master/src/channeloutput/ColorLight-5a-75.cpp#L39C44-L39C47
+      this.eth.send(this.src_mac, this.dest_mac, 0x5500, this.frameData5500, this.frame5500DataLength, this.flags)
     }
 
     // Without the following delay the end of the bottom row module flickers in the last line
     await delay(1)
-
-    n = this.eth.send(this.src_mac, this.dest_mac, 0x0107, this.frameData0107, this.frame0107DataLength, this.flags)
   }
-  // }
 }
 
 export async function delay (timeInMs: number): Promise<void> {
