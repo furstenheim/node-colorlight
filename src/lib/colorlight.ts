@@ -1,5 +1,7 @@
 import { Eth } from './eth'
 import { type Bitmap } from './Bitmap'
+import { type Mosaic } from './Mosaic'
+import {delay} from './utils'
 
 // Check https://github.com/FalconChristmas/fpp/blob/master/src/channeloutput/ColorLight-5a-75.cpp
 export class ColorLight {
@@ -76,7 +78,7 @@ export class ColorLight {
 
   private frame5500fromImage (ledRow: number, xOffset: number, bitmapRow: number, bitmap: Bitmap): void {
     this.frameData5500[0] = ledRow
-    for (let col = 0, destOffset = 7 + xOffset, srcOffset = bitmapRow * bitmap.width * 4; col < Math.min(this.width - xOffset, bitmap.width); ++col) {
+    for (let col = 0, destOffset = 7 + xOffset * 3, srcOffset = bitmapRow * bitmap.width * 4; col < Math.min(this.width - xOffset, bitmap.width); ++col) {
       this.frameData5500[destOffset++] = bitmap.data[srcOffset + 2]
       this.frameData5500[destOffset++] = bitmap.data[srcOffset + 1]
       this.frameData5500[destOffset++] = bitmap.data[srcOffset]
@@ -103,8 +105,19 @@ export class ColorLight {
     // Without the following delay the end of the bottom row module flickers in the last line
     await delay(1)
   }
-}
 
-export async function delay (timeInMs: number): Promise<void> {
-  await new Promise<void>(resolve => setTimeout(() => { resolve() }, timeInMs))
+  async showMosaic (mosaic: Mosaic): Promise<void> {
+    // Send one complete frame
+    this.eth.send(this.src_mac, this.dest_mac, 0x0101, this.frameData0107, this.frame0107DataLength, this.flags)
+    for (let i = 0; i < this.height; ++i) {
+      const y = i
+      mosaic.fillRowBuffer(this.frameData5500, 7, i)
+      this.frameData5500[0] = y
+      // TODO etherType probably 0x5501 if sending row over 256 https://github.com/FalconChristmas/fpp/blob/master/src/channeloutput/ColorLight-5a-75.cpp#L39C44-L39C47
+      this.eth.send(this.src_mac, this.dest_mac, 0x5500, this.frameData5500, this.frame5500DataLength, this.flags)
+    }
+
+    // Without the following delay the end of the bottom row module flickers in the last line
+    await delay(1)
+  }
 }

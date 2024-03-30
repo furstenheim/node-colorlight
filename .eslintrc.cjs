@@ -20,6 +20,7 @@ module.exports = {
   overrides: [
   ],
   rules: {
-    "@typescript-eslint/ban-ts-comment": "off"
+    "@typescript-eslint/ban-ts-comment": "off",
+    "@typescript-eslint/array-type": "off"
   }
 };
