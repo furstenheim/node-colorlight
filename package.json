@@ -1,7 +1,7 @@
 {
   "name": "node-colorlight",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "src/main.ts",
   "license": "MIT",
   "scripts": {
     "main": "tsx src/main.ts"
